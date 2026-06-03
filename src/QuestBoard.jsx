@@ -248,6 +248,21 @@ function AchievementBadge({ ach, unlocked }) {
 export default function QuestBoard() {
   // Auth / profile
   const [players, setPlayers] = useState([]);
+  useEffect(() => {
+  async function loadPlayers() {
+    const { data, error } = await supabase
+      .from("players")
+      .select("*")
+      .order("totalXP", { ascending: false });
+
+    if (!error) {
+  console.log("Players from Supabase:", data);
+  setPlayers(data);
+}
+  }
+
+  loadPlayers();
+}, []);
   const [screen, setScreen] = useState("login"); // login | signup | app
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [signupForm, setSignupForm] = useState({ username: "", password: "", bio: "", avatarColor: "#8b5cf6" });
@@ -455,7 +470,8 @@ No markdown, no explanation, just the JSON array.`
 
   // Build leaderboard
   const meEntry = { id: "me", username: profile?.username || "You", avatar: profile?.avatarColor || "#8b5cf6", totalXP, streak: stats.streak, weekXP: stats.weekXP + todayXP };
-  const allUsers = [...DEMO_FRIENDS, meEntry].sort((a, b) => (lbTab === "weekly" ? b.weekXP - a.weekXP : b.totalXP - a.totalXP));
+  const allUsers = [...players].sort(
+  (a, b) => b.totalXP - a.totalXP);
   const myRank = allUsers.findIndex(u => u.id === "me") + 1;
 
   // Avatar color options
