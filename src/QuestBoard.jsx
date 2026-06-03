@@ -1,3 +1,4 @@
+import { supabase } from "./supabase";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 // ── Pixel font via Google Fonts ──────────────────────────────────────────────
@@ -32,19 +33,9 @@ const ACHIEVEMENTS = [
   { id: "social", label: "Party Member", desc: "Post to the feed", icon: "🧑‍🤝‍🧑", check: (s) => s.feedPosts >= 1 },
 ];
 
-const DEMO_FRIENDS = [
-  { id: "f1", username: "PixelKnight", avatar: "#8b5cf6", totalXP: 1240, streak: 12, level: 4, weekXP: 180, tasks: ["Meditate 10min", "Read 30 pages", "Workout", "Code project", "Study flashcards"] },
-  { id: "f2", username: "QuestMage", avatar: "#f59e0b", totalXP: 890, streak: 5, level: 3, weekXP: 120, tasks: ["Morning jog", "Journal", "Learn Spanish", "Build habit", "Review notes"] },
-  { id: "f3", username: "RuneHunter", avatar: "#10b981", totalXP: 2100, streak: 21, level: 5, weekXP: 240, tasks: ["Cold shower", "No phone 2hr", "Draw sketch", "Cook healthy", "Stretch 20min"] },
-  { id: "f4", username: "StarForge", avatar: "#ec4899", totalXP: 350, streak: 3, level: 2, weekXP: 70, tasks: ["Plan week", "Water plants", "Call a friend", "Tidy desk", "Walk 5k steps"] },
-];
+const DEMO_FRIENDS = [];
 
-const FEED_SEED = [
-  { id: "fp1", user: "PixelKnight", avatar: "#8b5cf6", text: "Just crushed a 5km run under 25min! 🏃 #HealthQuest", time: "2m ago", emoji: "🔥", likes: 4 },
-  { id: "fp2", user: "RuneHunter", avatar: "#10b981", text: "21-day streak achieved! Never felt more productive in my life!", time: "18m ago", emoji: "⚡", likes: 9 },
-  { id: "fp3", user: "QuestMage", avatar: "#f59e0b", text: "Finally finished that chapter I've been putting off for weeks 📖", time: "1h ago", emoji: "👏", likes: 3 },
-  { id: "fp4", user: "StarForge", avatar: "#ec4899", text: "Completed my first perfect day! All 5 quests done! 🎉", time: "3h ago", emoji: "🎉", likes: 12 },
-];
+const FEED_SEED = [];
 
 function getLevel(xp) {
   let lvl = { level: 1, ...LEVELS[0] };
@@ -256,6 +247,7 @@ function AchievementBadge({ ach, unlocked }) {
 // ── Main App ─────────────────────────────────────────────────────────────────
 export default function QuestBoard() {
   // Auth / profile
+  const [players, setPlayers] = useState([]);
   const [screen, setScreen] = useState("login"); // login | signup | app
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [signupForm, setSignupForm] = useState({ username: "", password: "", bio: "", avatarColor: "#8b5cf6" });
@@ -263,14 +255,16 @@ export default function QuestBoard() {
 
   // App state
   const [tab, setTab] = useState("dashboard");
-  const [tasks, setTasks] = useState([
-    { title: "Morning workout", desc: "30 min cardio", difficulty: "Medium", done: false },
-    { title: "Read 20 pages", desc: "Current book", difficulty: "Easy", done: false },
-    { title: "Work on side project", desc: "", difficulty: "Hard", done: false },
-    { title: "Meditate 10 min", desc: "", difficulty: "Easy", done: false },
-    { title: "Learn something new", desc: "", difficulty: "Medium", done: false },
-  ]);
-  const [stats, setStats] = useState({ totalXP: 340, streak: 4, totalTasks: 18, perfectDays: 1, earlyBird: false, feedPosts: 0, weekXP: 90 });
+  const [tasks, setTasks] = useState([]);
+  const [stats, setStats] = useState({
+  totalXP: 0,
+  streak: 0,
+  totalTasks: 0,
+  perfectDays: 0,
+  earlyBird: false,
+  feedPosts: 0,
+  weekXP: 0,
+});
   const [feed, setFeed] = useState(FEED_SEED);
   const [newPost, setNewPost] = useState("");
   const [lbTab, setLbTab] = useState("weekly");
@@ -302,6 +296,21 @@ export default function QuestBoard() {
     });
     setPrevAchs(unlockedAchs);
   }, [totalXP, stats]);
+
+  useEffect(() => {
+  loadPlayers();
+}, []);
+
+async function loadPlayers() {
+  const { data, error } = await supabase
+    .from("players")
+    .select("*")
+    .order("totalXP", { ascending: false });
+
+  if (!error) {
+    setPlayers(data);
+  }
+}
 
   function spawnParticles(x, y) {
     const colors = ["#fbbf24", "#10b981", "#f472b6", "#60a5fa", "#a78bfa"];
@@ -415,11 +424,34 @@ No markdown, no explanation, just the JSON array.`
     setScreen("app");
   }
 
-  function handleSignup() {
-    if (!signupForm.username) return showToast("Pick a username!", "#ef4444");
-    setProfile({ username: signupForm.username, avatarColor: signupForm.avatarColor, bio: signupForm.bio || "On a quest for greatness." });
-    setScreen("app");
-  }
+  async function handleSignup() {
+  if (!signupForm.username)
+    return showToast("Pick a username!", "#ef4444");
+
+  setProfile({
+    username: signupForm.username,
+    avatarColor: signupForm.avatarColor,
+    bio: signupForm.bio || "On a quest for greatness."
+  });
+
+  const { data, error } = await supabase
+    .from("players")
+    .insert([
+      {
+        username: signupForm.username,
+        avatarcolor: signupForm.avatarColor,
+        totalXP: 0,
+        streak: 0,
+        totalTasks: 0,
+        perfectDays: 0,
+      },
+    ]);
+
+  console.log(data);
+  console.log(error);
+
+  setScreen("app");
+}
 
   // Build leaderboard
   const meEntry = { id: "me", username: profile?.username || "You", avatar: profile?.avatarColor || "#8b5cf6", totalXP, streak: stats.streak, weekXP: stats.weekXP + todayXP };
@@ -951,6 +983,7 @@ No markdown, no explanation, just the JSON array.`
             }}>LOGOUT</button>
           </div>
         )}
+      
       </div>
 
       {/* Bottom Nav */}
@@ -970,6 +1003,7 @@ No markdown, no explanation, just the JSON array.`
             <span style={{ fontSize: 18, filter: tab === t.id ? "none" : "grayscale(0.7) opacity(0.5)" }}>{t.icon}</span>
             <span style={{ fontFamily: "'Press Start 2P'", fontSize: 7, color: tab === t.id ? "#fbbf24" : "rgba(255,255,255,0.3)" }}>{t.label}</span>
           </button>
+          
         ))}
       </nav>
     </div>
